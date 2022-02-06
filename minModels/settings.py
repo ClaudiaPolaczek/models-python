@@ -38,6 +38,8 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'models.apps.ModelsConfig',
+    # Django REST framework
+    'rest_framework',
 ]
 
 MIDDLEWARE = [
@@ -71,16 +73,20 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'minModels.wsgi.application'
 
-
+# import mongoengine as db
+# from api_constants import mongo_password
+#
+# database_name = "models"
+# password = mongo_password
+# DB_URI = "mongodb+srv://models:{}@models.dtdpx.mongodb.net/{}?retryWrites=true&w=majority".format(password, database_name)
+# db.connect(host=DB_URI)
 # Database
 # https://docs.djangoproject.com/en/4.0/ref/settings/#databases
-
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
-    }
-}
+#DATABASES = {
+#    'default': {
+#       'ENGINE': 'django.db.backends.dummy'
+#    }
+#}
 
 
 # Password validation
