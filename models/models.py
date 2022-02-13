@@ -1,75 +1,119 @@
-from mongoengine import *
+from django.db import models
 import datetime
+from django.utils import timezone
 
-class Model(Document):
-   model_id = fields.IntField()
-   eyes_color = fields.StringField()
-   hair_color = fields.StringField()
-   survey_id = fields.IntField()
-   user_username = fields.StringField()
+class Model(models.Model):
+   user = models.ForeignKey('User', on_delete=models.CASCADE)
+   eyes_color = models.CharField(max_length=64)
+   hair_color = models.CharField(max_length=64)
+   survey = models.ForeignKey('Survey', on_delete=models.CASCADE)
+   user_username = models.CharField(max_length=500)
 
-class User(Document):
-   username = fields.StringField()
-   avg_rate = fields.FloatField()
-   main_photo_utl = fields.StringField()
-   password = fields.StringField()
-   role = fields.IntField()
+   def save(self, *args, **kwargs):
+      if not self.id:
+         self.eyes_color = "-"
+         self.hair_color = "-"
+      return super(Model, self).save(*args, **kwargs)
 
-class Notification(Document):
-   notification_id = fields.IntField()
-   added_date = fields.DateTimeField()
-   content = fields.StringField()
-   read_value = fields.IntField()
-   user_username = fields.StringField()
+class User(models.Model):
+   username = models.CharField(max_length=48, primary_key=True, unique=True)
+   password = models.CharField(max_length=48)
+   PHOTOGRAPHER = 'P'
+   MODEL = 'M'
+   ADMIN = 'A'
+   ROLES = [
+      (PHOTOGRAPHER, 'Photographer'),
+      (MODEL, 'Model'),
+      (ADMIN, 'Admin'),
+   ]
+   role = models.CharField(max_length=1, choices=ROLES, default=MODEL)
+   main_photo_url = models.URLField(blank=True, null=True)
+   avg_rate = models.FloatField()
 
-class Survey(Document):
-   survey_id = fields.IntField()
-   birthday_year = fields.IntField()
-   city = fields.StringField()
-   first_name = fields.StringField()
-   last_name = fields.StringField()
-   gender = fields.StringField()
-   instagram_name = fields.StringField()
-   phone_number = fields.StringField()
-   region = fields.StringField()
-   regulations_agreement = fields.IntField()
+   def save(self, *args, **kwargs):
+      if not self.id:
+         self.avg_rate = 0.0
+      return super(User, self).save(*args, **kwargs)
 
-class Photographer(Document):
-   photographer_id = fields.IntField()
-   survey_id = fields.IntField()
-   user_username = fields.StringField()
+class Notification(models.Model):
+   added_date = models.DateTimeField()
+   content = models.TextField(max_length=500)
+   read_value = models.IntegerField()
+   user = models.ForeignKey('User', on_delete=models.SET_NULL, null=True)
 
-class Comment(Document):
-   comment_id = fields.IntField()
-   added_date = fields.DateTimeField()
-   content = fields.StringField()
-   rated_user_username = fields.StringField()
-   rating_user_username = fields.StringField()
+   def save(self, *args, **kwargs):
+      if not self.id:
+         self.added_date = timezone.now()
+         self.read_value = 0
+      return super(Notification, self).save(*args, **kwargs)
 
-class Photoshoot(Document):
-   photoshoot_id = fields.IntField()
-   city = fields.StringField()
-   street = fields.StringField()
-   duration = fields.IntField()
-   house_number = fields.StringField()
-   meeting_date = fields.DateTimeField()
-   notes = fields.StringField()
-   photoshoot_status = fields.IntField()
-   topic = fields.StringField()
-   invited_user_username = fields.StringField()
-   inviting_user_username = fields.StringField()
+class Survey(models.Model):
+   first_name = models.CharField(max_length=64)
+   last_name = models.CharField(max_length=64)
+   birthday_year = models.IntegerField()
+   gender = models.CharField(max_length=1)
+   region = models.CharField(max_length=32)
+   city = models.CharField(max_length=32)
+   phone_number = models.CharField(max_length=16)
+   instagram_name = models.CharField(max_length=32)
+   regulations_agreement = models.IntegerField()
 
-class Portfolio(Document):
-   portfolio_id = fields.IntField()
-   added_date = fields.DateTimeField()
-   description = fields.StringField()
-   main_photo_url = fields.StringField()
-   name = fields.StringField()
-   user_username = fields.StringField()
+class Photographer(models.Model):
+   user = models.ForeignKey('User', on_delete=models.CASCADE)
+   survey = models.ForeignKey('Survey', on_delete=models.CASCADE)
 
-class Image(Document):
-   image_id = fields.IntField()
-   added_date = fields.DateTimeField()
-   file_url = fields.StringField()
-   name = fields.StringField()
-   portfolio_id = fields.IntField()
+class Comment(models.Model):
+   rating_user = models.ForeignKey('User', related_name='rating_user', on_delete=models.SET_NULL, null=True)
+   rated_user = models.ForeignKey('User', related_name='rated_user', on_delete=models.SET_NULL, null=True)
+   added_date = models.DateTimeField()
+   content = models.TextField()
+
+   def save(self, *args, **kwargs):
+      if not self.id:
+         self.added_date = timezone.now()
+      return super(Comment, self).save(*args, **kwargs)
+
+class Photoshoot(models.Model):
+   invited_user = models.ForeignKey('User', related_name='invited_user', on_delete=models.SET_NULL, null=True)
+   inviting_user = models.ForeignKey('User', related_name='inviting_user', on_delete=models.SET_NULL, null=True)
+   CREATED = 'C'
+   ACCEPTED = 'A'
+   CANCELED = 'D'
+   ENDED = 'E'
+   ROLES = [
+      (CREATED, 'Created'),
+      (ACCEPTED, 'Accepted'),
+      (CANCELED, 'Canceled'),
+      (ENDED, 'Ended'),
+   ]
+   photoshoot_status = models.CharField(max_length=1, choices=ROLES, default=CREATED)
+   topic = models.CharField(max_length=64)
+   notes = models.TextField()
+   meeting_date = models.DateTimeField()
+   duration = models.DurationField()
+   city = models.CharField(max_length=128)
+   street = models.CharField(max_length=128)
+   house_number = models.CharField(max_length=64)
+
+class Portfolio(models.Model):
+   user = models.ForeignKey('User', on_delete=models.CASCADE)
+   name = models.CharField(max_length=32)
+   description = models.TextField()
+   main_photo_url = models.URLField()
+   added_date = models.DateTimeField()
+
+   def save(self, *args, **kwargs):
+      if not self.id:
+         self.added_date = timezone.now()
+      return super(Portfolio, self).save(*args, **kwargs)
+
+class Image(models.Model):
+   portfolio = models.ForeignKey('Portfolio', on_delete=models.CASCADE)
+   file_url = models.URLField()
+   name = models.CharField(max_length=32)
+   added_date = models.DateTimeField()
+
+   def save(self, *args, **kwargs):
+      if not self.id:
+         self.added_date = timezone.now()
+      return super(Image, self).save(*args, **kwargs)

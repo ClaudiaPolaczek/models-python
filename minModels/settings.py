@@ -40,7 +40,18 @@ INSTALLED_APPS = [
     'models.apps.ModelsConfig',
     # Django REST framework
     'rest_framework',
+    'corsheaders',
 ]
+
+CORS_ORIGIN_ALLOW_ALL = True
+CORS_ALLOW_METHODS = (
+        'GET',
+        'POST',
+        'PUT',
+        'PATCH',
+        'DELETE',
+        'OPTIONS'
+    )
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
@@ -50,6 +61,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'corsheaders.middleware.CorsMiddleware',
 ]
 
 ROOT_URLCONF = 'minModels.urls'
@@ -73,20 +85,24 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'minModels.wsgi.application'
 
-# import mongoengine as db
-# from api_constants import mongo_password
-#
-# database_name = "models"
-# password = mongo_password
-# DB_URI = "mongodb+srv://models:{}@models.dtdpx.mongodb.net/{}?retryWrites=true&w=majority".format(password, database_name)
-# db.connect(host=DB_URI)
+
+from api_constants import mongo_password
+
+database_name = "models"
+password = mongo_password
+
 # Database
 # https://docs.djangoproject.com/en/4.0/ref/settings/#databases
-#DATABASES = {
-#    'default': {
-#       'ENGINE': 'django.db.backends.dummy'
-#    }
-#}
+DATABASES = {
+    'default': {
+       'ENGINE': 'djongo',
+        'NAME': 'models',
+        'CLIENT': {
+            'host': "mongodb+srv://models:{}@models.dtdpx.mongodb.net/{}?retryWrites=true&w=majority".format(password, database_name),
+            'authMechanism': "SCRAM-SHA-1",
+        }
+    }
+}
 
 
 # Password validation
