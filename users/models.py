@@ -19,7 +19,7 @@ class CustomUser(AbstractUser):
     avg_rate = models.FloatField()
 
     USERNAME_FIELD = 'username'
-    REQUIRED_FIELDS = ['username']
+    #REQUIRED_FIELDS = ['username']
     objects = CustomUserManager()
 
     def __str__(self):

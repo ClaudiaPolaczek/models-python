@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from .models import *
-
+from users.serializers import RegisterSerializer, CustomUserSerializer
 
 class UserReaderSerializer(serializers.ModelSerializer):
     class Meta:
@@ -130,25 +130,32 @@ class PhotographerReaderSerializer(serializers.ModelSerializer):
 
 
 class PhotographerWriterSerializer(serializers.ModelSerializer):
-    user = UserWriterSerializer(many=False)
-    survey = SurveyWriterSerializer(many=False)
-
-    def create(self, validated_data):
-        user_serializer = UserWriterSerializer(validated_data.get('user'))
-        user = user_serializer.save()
-        user.role = user.PHOTOGRAPHER
-        user.save()
-        survey_serializer = SurveyWriterSerializer(validated_data.get('survey'))
-        survey_serializer.save()
-        return Photographer.objects.create(**validated_data)
-
-    def update(self, validated_data):
-        #TODO
-        return Photographer.objects.create(**validated_data)
+    #username = models.CharField(max_length=48)
+    #user = RegisterSerializer(many=False)
+    #survey = models.IntegerField()
+    #survey = SurveyWriterSerializer(many=False)
 
     class Meta:
         model = Photographer
         fields = ('user', 'survey')
+
+    def create(self, validated_data):
+        user = validated_data.get('user')
+        survey = validated_data.get('survey')
+        #survey = Survey.objects.get(id=validated_data.get('survey'))
+        user.role = User.PHOTOGRAPHER
+        user.save()
+        photographer = Photographer.objects.create(
+                user=user,
+                survey=survey)
+        return photographer
+
+    def update(self, instance, validated_data):
+        instance.email = validated_data.get('email', instance.email)
+        instance.content = validated_data.get('content', instance.content)
+        instance.created = validated_data.get('created', instance.created)
+        instance.save()
+        return instance
 
 class AdditionalPhotographerWriterSerializer(serializers.Serializer):
     username = models.CharField(max_length=48, primary_key=True, unique=True)

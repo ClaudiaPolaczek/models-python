@@ -39,9 +39,10 @@ INSTALLED_APPS = [
     'django.contrib.sites',
     'allauth',
     'allauth.account',
-    'rest_auth.registration',
+    #'rest_auth.registration',
     'rest_framework.authtoken',
-    'rest_auth',
+    #'rest_auth',
+    'dj_rest_auth',
     'users',
     # Django REST framework
     'rest_framework',
@@ -138,6 +139,21 @@ USE_I18N = True
 
 USE_TZ = True
 
+SITE_ID = 1
+
+AUTHENTICATION_BACKENDS = (
+    # Needed to login by custom User model, regardless of `allauth`
+    "django.contrib.auth.backends.ModelBackend",
+
+    # `allauth` specific authentication methods, such as login by e-mail
+    "allauth.account.auth_backends.AuthenticationBackend",
+)
+
+
+REST_AUTH_SERIALIZERS = {
+    'USER_DETAILS_SERIALIZER': 'users.serializers.CustomUserSerializer',
+}
+
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/4.0/howto/static-files/
 
@@ -146,6 +162,22 @@ STATIC_URL = 'static/'
 # Default primary key field type
 # https://docs.djangoproject.com/en/4.0/ref/settings/#default-auto-field
 
+REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': [
+        'rest_framework.authentication.BasicAuthentication',
+        'rest_framework.authentication.TokenAuthentication',
+        'users.serializers.BearerAuthentication',
+    ],
+    'DEFAULT_PERMISSION_CLASSES': (
+        'rest_framework.permissions.IsAuthenticated',
+    ),
+    'DEFAULT_SCHEMA_CLASS': 'rest_framework.schemas.coreapi.AutoSchema'
+}
+
+REST_AUTH_REGISTER_SERIALIZERS = {
+    'REGISTER_SERIALIZER': 'users.serializers.RegisterSerializer',
+}
+
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 AUTH_USER_MODEL = 'users.CustomUser'
@@ -153,3 +185,4 @@ AUTH_USER_MODEL = 'users.CustomUser'
 ACCOUNT_USER_MODEL_USERNAME_FIELD = 'username'
 ACCOUNT_USERNAME_REQUIRED = True
 ACCOUNT_AUTHENTICATION_METHOD = 'username'
+ACCOUNT_UNIQUE_USERNAME = True

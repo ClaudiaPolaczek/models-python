@@ -4,6 +4,7 @@ from django.conf import settings
 
 from users.models import CustomUser as User
 
+
 class Model(models.Model):
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
     eyes_color = models.CharField(max_length=64)
@@ -50,7 +51,7 @@ class Photographer(models.Model):
 class Comment(models.Model):
     rating_user = models.ForeignKey(settings.AUTH_USER_MODEL, related_name='rating', on_delete=models.SET_NULL, null=True)
     rated_user = models.ForeignKey(settings.AUTH_USER_MODEL, related_name='rated', on_delete=models.SET_NULL, null=True)
-    rating = models.IntegerField()
+    rating = models.IntegerField(default=0.0)
     added_date = models.DateTimeField()
     content = models.TextField()
 

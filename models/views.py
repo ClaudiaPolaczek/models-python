@@ -359,15 +359,38 @@ class PhotographersViewSet(viewsets.ViewSet):
         return Response(write_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     def delete(self, request, pk=None):
-        photoshoot = Photoshoot.objects.get(pk=pk)
-        photoshoot.delete()
+        photographer = Photographer.objects.get(pk=pk)
+        photographer.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
+
+class SurveysViewSet(viewsets.ViewSet):
+
+    def retrieve(self, request, pk=None):
+        survey = Survey.objects.get(pk=pk)
+        serializer = SurveyReaderSerializer(survey)
+        return Response(serializer.data)
+
+    def list(self, request):
+        queryset = Survey.objects.all()
+        serializer = SurveyReaderSerializer(queryset, many=True)
+        return Response(serializer.data)
+
+    def create(self, request, *args, **kwargs):
+        write_serializer = SurveyWriterSerializer(data=request.data)
+        if write_serializer.is_valid():
+            survey = write_serializer.save()
+            read_serializer = SurveyReaderSerializer(survey)
+            return Response(read_serializer.data, status=status.HTTP_201_CREATED)
+        return Response(write_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 class UsersViewSet(viewsets.ViewSet):
 
     def retrieve(self, request, pk=None):
-        user = User.objects.get(pk=pk)
+        try:
+            user = User.objects.get(pk=pk)
+        except User.DoesNotExist:
+            return Response('User not found', status=status.HTTP_404_NOT_FOUND)
         serializer = UserReaderSerializer(user)
         return Response(serializer.data)
 
@@ -383,7 +406,6 @@ class UsersViewSet(viewsets.ViewSet):
             user = User.objects.get(username=username)
         except User.DoesNotExist:
             return Response('User not found', status=status.HTTP_404_NOT_FOUND)
-
         serializer = UserReaderSerializer(user)
         return Response(serializer.data)
 
