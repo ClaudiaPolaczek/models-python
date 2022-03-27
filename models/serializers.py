@@ -2,16 +2,11 @@ from rest_framework import serializers
 from .models import *
 from users.serializers import RegisterSerializer, CustomUserSerializer
 
+
 class UserReaderSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = ('id', 'username', 'password', 'role', 'main_photo_url', 'avg_rate')
-
-    #def validate_password(self, value):
-        # Run validations for Other model here, either manually or through OtherSerializer's is_valid method. You won't have booking_id in value here though, take that into account when modelling your validation process
-
-    #def validate_main_photo_url(self, value):
-        # Run validations specific to feedback field here, if necessary. You can do this for all serializer fields
 
 
 class UserWriterSerializer(serializers.ModelSerializer):

@@ -3,9 +3,8 @@ from django.contrib.auth.models import AbstractUser
 
 from .managers import CustomUserManager
 
-
 class CustomUser(AbstractUser):
-    username = models.CharField(max_length=40, unique=True)
+    email = models.EmailField(unique=True)
     PHOTOGRAPHER = 'P'
     MODEL = 'M'
     ADMIN = 'A'
@@ -18,14 +17,9 @@ class CustomUser(AbstractUser):
     main_photo_url = models.URLField(blank=True, null=True)
     avg_rate = models.FloatField()
 
-    USERNAME_FIELD = 'username'
-    #REQUIRED_FIELDS = ['username']
+    USERNAME_FIELD = 'email'
+    REQUIRED_FIELDS = ['role']
     objects = CustomUserManager()
 
     def __str__(self):
-        return self.username
-
-    def save(self, *args, **kwargs):
-        if not self.id:
-            self.avg_rate = 0.0
-        return super(CustomUser, self).save(*args, **kwargs)
+        return self.email

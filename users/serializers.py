@@ -1,14 +1,18 @@
+from django.contrib.auth.forms import ReadOnlyPasswordHashField
 from rest_framework import serializers, authentication
 from users.models import CustomUser
 from allauth.account import app_settings as allauth_settings
 from allauth.account.adapter import get_adapter
 from allauth.account.utils import setup_user_email
+from allauth.utils import email_address_exists
 
 
 class CustomUserSerializer(serializers.ModelSerializer):
+    password = ReadOnlyPasswordHashField()
+
     class Meta:
         model = CustomUser
-        fields = ['id', 'username', 'role', 'main_photo_url', 'avg_rate']
+        fields = ['id', 'email', 'role', 'main_photo_url', 'avg_rate']
 
 
 class BearerAuthentication(authentication.TokenAuthentication):
@@ -16,15 +20,16 @@ class BearerAuthentication(authentication.TokenAuthentication):
 
 
 class RegisterSerializer(serializers.Serializer):
-    username = serializers.CharField(required=allauth_settings.USERNAME_REQUIRED)
+    email = serializers.EmailField(required=allauth_settings.EMAIL_REQUIRED)
     password1 = serializers.CharField(required=True, write_only=True)
     password2 = serializers.CharField(required=True, write_only=True)
 
-    def validate_username(self, username):
-        #if allauth_settings.UNIQUE_USERNAME:
-        #    if username:
-        #        raise serializers.ValidationError("A user is already registered with this username.")
-        return username
+    def validate_email(self, email):
+        email = get_adapter().clean_email(email)
+        if allauth_settings.UNIQUE_EMAIL:
+            if email and email_address_exists(email):
+                raise serializers.ValidationError(("A user is already registered with this e-mail address."))
+        return email
 
     def validate_password1(self, password):
         return get_adapter().clean_password(password)
@@ -37,7 +42,7 @@ class RegisterSerializer(serializers.Serializer):
     def get_cleaned_data(self):
         return {
             'password1': self.validated_data.get('password1', ''),
-            'username': self.validated_data.get('username', ''),
+            'email': self.validated_data.get('email', ''),
         }
 
     def save(self, request):
@@ -45,6 +50,7 @@ class RegisterSerializer(serializers.Serializer):
         user = adapter.new_user(request)
         self.cleaned_data = self.get_cleaned_data()
         adapter.save_user(request, user, self)
-        #setup_user_email(request, user, [])
-        user.save(request)
+        setup_user_email(request, user, [])
+        user.avg_rate = 0.0
+        user.save()
         return user

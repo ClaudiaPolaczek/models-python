@@ -217,8 +217,7 @@ class CommentsViewSet(viewsets.ViewSet):
                     for comment in comments:
                         sum += comment.rating
                     avg = sum / len(comments)
-                    user.avg_rate = avg
-                    user.save()
+                    user.update(avg_rate=avg)
         serializer = UserReaderSerializer(users, many=True)
         return Response(serializer.data)
 
@@ -384,6 +383,39 @@ class SurveysViewSet(viewsets.ViewSet):
             return Response(read_serializer.data, status=status.HTTP_201_CREATED)
         return Response(write_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
+    def partial_update(self, request, pk=None):
+        try:
+            survey = Survey.objects.get(pk=pk)
+        except Survey.DoesNotExist:
+            return Response('Survey not found', status=status.HTTP_404_NOT_FOUND)
+        data = self.request.data
+        survey.first_name = data["first_name"]
+        survey.last_name = data["last_name"]
+        survey.birthday_year = data["birthday_year"]
+        survey.gender = data["gender"]
+        survey.region = data["region"]
+        survey.city = data["city"]
+        survey.phone_number = data["phone_number"]
+        survey.regulations_agreement = data["regulations_agreement"]
+        survey.save()
+        return Response(status=status.HTTP_200_OK)
+
+    @action(detail=False, methods=['post'], url_path='instagram')
+    def set_instagram_name(self, request, pk=None):
+        try:
+            survey = Survey.objects.get(pk=pk)
+        except Survey.DoesNotExist:
+            return Response('Survey not found', status=status.HTTP_404_NOT_FOUND)
+        data = self.request.data
+        survey.instagram_name = data["instagram_name"]
+        survey.save()
+        return Response(status=status.HTTP_200_OK)
+
+    def delete(self, request, pk=None):
+        survey = Survey.objects.get(pk=pk)
+        survey.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
 class UsersViewSet(viewsets.ViewSet):
 
     def retrieve(self, request, pk=None):
@@ -409,23 +441,29 @@ class UsersViewSet(viewsets.ViewSet):
         serializer = UserReaderSerializer(user)
         return Response(serializer.data)
 
-    @action(detail=False, methods=['patch'], url_path='password')
-    def change_password(self, request, pk=None):
-        user = User.objects.get(username=pk)
-        #TODO change password
-        user.main_photo_url = request.data["password"]
-        user.save()
-        return Response(user, status=status.HTTP_200_OK)
+    @action(detail=False, methods=['get'], url_path='email')
+    def retrieve_by_email(self, request):
+        email = self.request.GET.get('email', '')
+        try:
+            user = User.objects.get(email=email)
+        except User.DoesNotExist:
+            return Response('User not found', status=status.HTTP_404_NOT_FOUND)
+        serializer = UserReaderSerializer(user)
+        return Response(serializer.data)
 
-    @action(detail=False, methods=['patch'], url_path='photo')
+    @action(detail=False, methods=['post'], url_path='photo')
     def add_main_photo(self, request, pk=None):
-        user = User.objects.get(username=pk)
-        user.main_photo_url = request.data["main_photo_url"]
-        user.save()
-        return Response(user, status=status.HTTP_200_OK)
+        email = self.request.GET.get('email', '')
+        try:
+            users = User.objects.filter(email=email).values()
+        except User.DoesNotExist:
+            return Response('User not found', status=status.HTTP_404_NOT_FOUND)
+        for user in users:
+            user.update(main_photo_url = request.data["fileUrl"])
+            return Response(user, status=status.HTTP_200_OK)
 
     def delete(self, request, pk=None):
         user = User.objects.get(pk=pk)
         user.delete()
-        #TODO usuniecie wszystkiego co zwiazane
+        #TODO usuniecie wszystkiego co zwiazane z Userem
         return Response(status=status.HTTP_204_NO_CONTENT)
