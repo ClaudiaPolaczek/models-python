@@ -5,17 +5,39 @@ from django.conf import settings
 from users.models import CustomUser as User
 
 
+class Survey(models.Model):
+    first_name = models.CharField(max_length=64)
+    last_name = models.CharField(max_length=64)
+    birthday_year = models.IntegerField()
+    gender = models.CharField(max_length=1)
+    region = models.CharField(max_length=32)
+    city = models.CharField(max_length=32)
+    phone_number = models.CharField(max_length=16)
+    instagram_name = models.CharField(max_length=32)
+    regulations_agreement = models.IntegerField()
+
+
 class Model(models.Model):
-    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
     eyes_color = models.CharField(max_length=64)
     hair_color = models.CharField(max_length=64)
-    survey = models.ForeignKey('Survey', on_delete=models.CASCADE)
+    survey = models.OneToOneField(Survey, on_delete=models.CASCADE)
 
     def save(self, *args, **kwargs):
         if not self.id:
             self.eyes_color = "-"
             self.hair_color = "-"
         return super(Model, self).save(*args, **kwargs)
+
+
+class Photographer(models.Model):
+    user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    survey = models.OneToOneField(Survey, on_delete=models.CASCADE)
+
+    def delete(self, *args, **kwargs):
+        self.survey.delete()
+        self.user.delete()
+        return super(self.__class__, self).delete(*args, **kwargs)
 
 
 class Notification(models.Model):
@@ -31,26 +53,9 @@ class Notification(models.Model):
         return super(Notification, self).save(*args, **kwargs)
 
 
-class Survey(models.Model):
-    first_name = models.CharField(max_length=64)
-    last_name = models.CharField(max_length=64)
-    birthday_year = models.IntegerField()
-    gender = models.CharField(max_length=1)
-    region = models.CharField(max_length=32)
-    city = models.CharField(max_length=32)
-    phone_number = models.CharField(max_length=16)
-    instagram_name = models.CharField(max_length=32)
-    regulations_agreement = models.IntegerField()
-
-
-class Photographer(models.Model):
-    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
-    survey = models.ForeignKey('Survey', on_delete=models.CASCADE)
-
-
 class Comment(models.Model):
-    rating_user = models.ForeignKey(settings.AUTH_USER_MODEL, related_name='rating', on_delete=models.SET_NULL, null=True)
-    rated_user = models.ForeignKey(settings.AUTH_USER_MODEL, related_name='rated', on_delete=models.SET_NULL, null=True)
+    rating_user = models.ForeignKey(settings.AUTH_USER_MODEL, related_name='rating', on_delete=models.CASCADE)
+    rated_user = models.ForeignKey(settings.AUTH_USER_MODEL, related_name='rated', on_delete=models.CASCADE)
     rating = models.IntegerField(default=0.0)
     added_date = models.DateTimeField()
     content = models.TextField()
@@ -88,7 +93,7 @@ class Portfolio(models.Model):
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
     name = models.CharField(max_length=32)
     description = models.TextField()
-    main_photo_url = models.URLField()
+    main_photo_url = models.URLField(null=True)
     added_date = models.DateTimeField()
 
     def save(self, *args, **kwargs):

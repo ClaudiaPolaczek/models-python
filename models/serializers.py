@@ -1,3 +1,5 @@
+from django.db.models.signals import post_delete
+from django.dispatch import receiver
 from rest_framework import serializers
 from .models import *
 from users.serializers import RegisterSerializer, CustomUserSerializer
@@ -24,7 +26,6 @@ class NotificationReaderSerializer(serializers.ModelSerializer):
 
 
 class NotificationWriterSerializer(serializers.ModelSerializer):
-    user = UserWriterSerializer(many=False)
 
     class Meta:
         model = Notification
@@ -41,8 +42,6 @@ class CommentReaderSerializer(serializers.ModelSerializer):
 
 
 class CommentWriterSerializer(serializers.ModelSerializer):
-    rating_user = UserWriterSerializer(many=False)
-    rated_user = UserWriterSerializer(many=False)
 
     class Meta:
         model = Comment
@@ -54,15 +53,15 @@ class PortfolioReaderSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Portfolio
-        fields = ('id', 'user', 'description', 'main_photo_url', 'added_date')
+        fields = ('id', 'user', 'name', 'description', 'main_photo_url', 'added_date')
 
 
 class PortfolioWriterSerializer(serializers.ModelSerializer):
-    user = UserWriterSerializer(many=False)
+    main_photo_url = serializers.URLField(allow_blank=True)
 
     class Meta:
         model = Portfolio
-        fields = ('user', 'description', 'main_photo_url')
+        fields = ('user', 'name', 'description', 'main_photo_url')
 
 
 class ImageReaderSerializer(serializers.ModelSerializer):
@@ -74,7 +73,6 @@ class ImageReaderSerializer(serializers.ModelSerializer):
 
 
 class ImageWriterSerializer(serializers.ModelSerializer):
-    portfolio = PortfolioWriterSerializer(many=False)
 
     class Meta:
         model = Image
@@ -92,12 +90,10 @@ class PhotoshootReaderSerializer(serializers.ModelSerializer):
 
 
 class PhotoshootWriterSerializer(serializers.ModelSerializer):
-    invited_user = UserWriterSerializer(many=False)
-    inviting_user = UserWriterSerializer(many=False)
 
     class Meta:
         model = Photoshoot
-        fields = ('invited_user', 'inviting_user', 'photoshoot_status', 'topic', 'notes', 'meeting_date', 'duration',
+        fields = ('invited_user', 'inviting_user', 'topic', 'notes', 'meeting_date', 'duration',
                   'city', 'street', 'house_number')
 
 
@@ -115,92 +111,21 @@ class SurveyWriterSerializer(serializers.ModelSerializer):
                   'phone_number', 'regulations_agreement')
 
 
-class PhotographerReaderSerializer(serializers.ModelSerializer):
+class PhotographerSerializer(serializers.ModelSerializer):
     user = UserReaderSerializer(many=False, read_only=True)
     survey = SurveyReaderSerializer(many=False, read_only=True)
 
     class Meta:
         model = Photographer
         fields = ('id', 'user', 'survey')
+        depth = 1
 
 
-class PhotographerWriterSerializer(serializers.ModelSerializer):
-    #username = models.CharField(max_length=48)
-    #user = RegisterSerializer(many=False)
-    #survey = models.IntegerField()
-    #survey = SurveyWriterSerializer(many=False)
-
-    class Meta:
-        model = Photographer
-        fields = ('user', 'survey')
-
-    def create(self, validated_data):
-        user = validated_data.get('user')
-        survey = validated_data.get('survey')
-        #survey = Survey.objects.get(id=validated_data.get('survey'))
-        user.role = User.PHOTOGRAPHER
-        user.save()
-        photographer = Photographer.objects.create(
-                user=user,
-                survey=survey)
-        return photographer
-
-    def update(self, instance, validated_data):
-        instance.email = validated_data.get('email', instance.email)
-        instance.content = validated_data.get('content', instance.content)
-        instance.created = validated_data.get('created', instance.created)
-        instance.save()
-        return instance
-
-class AdditionalPhotographerWriterSerializer(serializers.Serializer):
-    username = models.CharField(max_length=48, primary_key=True, unique=True)
-    password = models.CharField(max_length=48)
-    first_name = models.CharField(max_length=64)
-    last_name = models.CharField(max_length=64)
-    birthday_year = models.IntegerField()
-    gender = models.CharField(max_length=1)
-    region = models.CharField(max_length=32)
-    city = models.CharField(max_length=32)
-    phone_number = models.CharField(max_length=16)
-    regulations_agreement = models.IntegerField()
-
-    def create(self, validated_data):
-        return User.objects.create(**validated_data)
-
-    def update(self, instance, validated_data):
-        instance.email = validated_data.get('email', instance.email)
-        instance.content = validated_data.get('content', instance.content)
-        instance.created = validated_data.get('created', instance.created)
-        instance.save()
-        return instance
-
-
-class ModelReaderSerializer(serializers.ModelSerializer):
+class ModelSerializer(serializers.ModelSerializer):
     user = UserReaderSerializer(many=False, read_only=True)
     survey = SurveyReaderSerializer(many=False, read_only=True)
 
     class Meta:
         model = Model
         fields = ('id', 'user', 'eyes_color', 'hair_color', 'survey')
-
-
-class ModelWriterSerializer(serializers.ModelSerializer):
-    user = UserWriterSerializer(many=False)
-    survey = SurveyWriterSerializer(many=False)
-
-    def create(self, validated_data):
-        user_serializer = UserWriterSerializer(validated_data.get('user'))
-        user = user_serializer.save()
-        user.role = user.PHOTOGRAPHER
-        user.save()
-        survey_serializer = SurveyWriterSerializer(validated_data.get('survey'))
-        survey_serializer.save()
-        return Model.objects.create(**validated_data)
-
-    def update(self, validated_data):
-        #TODO
-        return Model.objects.create(**validated_data)
-
-    class Meta:
-        model = Model
-        fields = ('user', 'eyes_color', 'hair_color', 'survey')
+        depth = 1

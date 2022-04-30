@@ -1,4 +1,7 @@
-from django.shortcuts import render
+from django.db import transaction, IntegrityError
+import operator
+from django.db.models import Q
+
 from .models import Notification, Image, Portfolio, Comment, User
 from rest_framework import viewsets, status, permissions
 from rest_framework.response import Response
@@ -6,8 +9,6 @@ from rest_framework.decorators import action
 from django.shortcuts import get_object_or_404
 from django.views.decorators.csrf import csrf_exempt
 from .serializers import *
-from rest_framework.parsers import JSONParser
-from django.http.response import JsonResponse
 
 
 class NotificationsViewSet(viewsets.ViewSet):
@@ -39,7 +40,6 @@ class NotificationsViewSet(viewsets.ViewSet):
         serializer = NotificationReaderSerializer(notification)
         return Response(serializer.data)
 
-    #TODO: sciezka na read/id
     @action(detail=False, methods=['patch'], url_path='read')
     def read(self, request):
         id = self.request.GET.get('id', '')
@@ -77,7 +77,7 @@ class ImagesViewSet(viewsets.ViewSet):
         serializer = ImageReaderSerializer(image)
         return Response(serializer.data)
 
-    @action(detail=False, methods=['get'])
+    @action(detail=False, methods=['get'],)
     def retrieve_by_portfolio(self, request):
         portfolio = self.request.GET.get('portfolio', '')
         try:
@@ -105,14 +105,15 @@ class ImagesViewSet(viewsets.ViewSet):
         image.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
-    @action(detail=True, methods=['delete'], url_path='url')
+    @action(detail=False, methods=['delete'], url_path='url')
     def delete_by_url(self, request):
         url = self.request.GET.get('url', '')
         try:
-            image = Image.objects.filter(url=url)
+            images = Image.objects.filter(file_url=url)
         except Image.DoesNotExist:
             return Response('Images not found', status=status.HTTP_404_NOT_FOUND)
-        image.delete()
+        for image in images:
+            image.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
@@ -146,11 +147,6 @@ class PortfolioViewSet(viewsets.ViewSet):
             return Response(read_serializer.data, status=status.HTTP_201_CREATED)
         return Response(write_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-    def delete(self, request, pk=None):
-        portfolio = Portfolio.objects.get(pk=pk)
-        portfolio.delete()
-        return Response(status=status.HTTP_204_NO_CONTENT)
-
     def partial_update(self, request, pk=None):
         try:
             portfolio = Portfolio.objects.get(pk=pk)
@@ -158,11 +154,11 @@ class PortfolioViewSet(viewsets.ViewSet):
             return Response('Portfolio not found', status=status.HTTP_404_NOT_FOUND)
         data = self.request.data
         portfolio.description = data["description"]
-        portfolio.main_photo_url = data["main_photo_url"]
+        portfolio.name = data["name"]
         portfolio.save()
         return Response(status=status.HTTP_200_OK)
 
-    @action(detail=True, methods=['update'], url_path='photo')
+    @action(detail=False, methods=['patch'], url_path='photo')
     def add_main_photo(self, request):
         id = self.request.GET.get('id', '')
         try:
@@ -174,6 +170,11 @@ class PortfolioViewSet(viewsets.ViewSet):
         portfolio.save()
         return Response(status=status.HTTP_200_OK)
 
+    def delete(self, request, pk=None):
+        portfolio = Portfolio.objects.get(pk=pk)
+        portfolio.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
 
 class CommentsViewSet(viewsets.ViewSet):
 
@@ -182,24 +183,43 @@ class CommentsViewSet(viewsets.ViewSet):
         serializer = CommentReaderSerializer(comment)
         return Response(serializer.data)
 
-    @action(detail=False, methods=['get'])
+    @action(detail=False, methods=['get'], url_path='rating')
     def retrieve_by_rating_user(self, request):
-        user = self.request.GET.get('username', '')
+        user = self.request.GET.get('email', '')
         try:
-            comment = Comment.objects.filter(rating_user__username=user)
+            comment = Comment.objects.filter(rating_user__email=user)
         except Comment.DoesNotExist:
             return Response('Comments not found', status=status.HTTP_404_NOT_FOUND)
         serializer = CommentReaderSerializer(comment, many=True)
         return Response(serializer.data)
 
-    @action(detail=False, methods=['get'])
+    @action(detail=False, methods=['get'], url_path='rated')
     def retrieve_by_rated_user(self, request):
-        user = self.request.GET.get('username', '')
+        user = self.request.GET.get('email', '')
         try:
-            comment = Comment.objects.filter(rated_user__username=user)
+            comment = Comment.objects.filter(rated_user__email=user)
         except Comment.DoesNotExist:
             return Response('Comments not found', status=status.HTTP_404_NOT_FOUND)
         serializer = CommentReaderSerializer(comment, many=True)
+        return Response(serializer.data)
+
+    @action(detail=False, methods=['get'], url_path='users')
+    def retrieve_by_rating_and_rated_user(self, request):
+        user_rating_email = self.request.GET.get('email_rating', '')
+        user_rated_email = self.request.GET.get('email_rated', '')
+        try:
+            user_rating = User.objects.filter(email=user_rating_email).first()
+        except User.DoesNotExist:
+            return Response('User not found', status=status.HTTP_404_NOT_FOUND)
+        try:
+            user_rated = User.objects.filter(email=user_rated_email).first()
+        except User.DoesNotExist:
+            return Response('User not found', status=status.HTTP_404_NOT_FOUND)
+        try:
+            comments = Comment.objects.filter(rating_user__id=user_rating.id, rated_user__id=user_rated.id)
+        except Comment.DoesNotExist:
+            return Response('Comments not found', status=status.HTTP_404_NOT_FOUND)
+        serializer = CommentReaderSerializer(comments, many=True)
         return Response(serializer.data)
 
     @action(detail=False, methods=['get'], url_path='avg')
@@ -211,13 +231,14 @@ class CommentsViewSet(viewsets.ViewSet):
             return Response('Users do not exists', status=status.HTTP_404_NOT_FOUND)
         for user in users:
             if user.role != User.ADMIN:
-                comments = Comment.objects.filter(rated_user__username=user)
+                comments = Comment.objects.filter(rated_user__email=user)
                 if len(comments) != 0:
                     sum = 0.0
                     for comment in comments:
                         sum += comment.rating
                     avg = sum / len(comments)
-                    user.update(avg_rate=avg)
+                    user.avg_rate = avg
+                    user.save()
         serializer = UserReaderSerializer(users, many=True)
         return Response(serializer.data)
 
@@ -244,14 +265,14 @@ class PhotoshootsViewSet(viewsets.ViewSet):
 
     def retrieve(self, request, pk=None):
         photoshoot = Photoshoot.objects.get(pk=pk)
-        serializer = PortfolioReaderSerializer(photoshoot)
+        serializer = PhotoshootReaderSerializer(photoshoot)
         return Response(serializer.data)
 
     @action(detail=False, methods=['get'], url_path='inviting')
     def retrieve_by_inviting_user(self, request):
-        user = self.request.GET.get('username', '')
+        user = self.request.GET.get('email', '')
         try:
-            photoshoot = Photoshoot.objects.filter(inviting_user__username=user)
+            photoshoot = Photoshoot.objects.filter(inviting_user__email=user)
         except Photoshoot.DoesNotExist:
             return Response('Photoshoots not found', status=status.HTTP_404_NOT_FOUND)
         serializer = PhotoshootReaderSerializer(photoshoot, many=True)
@@ -259,9 +280,9 @@ class PhotoshootsViewSet(viewsets.ViewSet):
 
     @action(detail=False, methods=['get'], url_path='invited')
     def retrieve_by_invited_user(self, request):
-        user = self.request.GET.get('username', '')
+        user = self.request.GET.get('email', '')
         try:
-            photoshoot = Photoshoot.objects.filter(invited_user__username=user)
+            photoshoot = Photoshoot.objects.filter(invited_user__email=user)
         except Comment.DoesNotExist:
             return Response('Photoshoots not found', status=status.HTTP_404_NOT_FOUND)
         serializer = PhotoshootReaderSerializer(photoshoot, many=True)
@@ -280,87 +301,246 @@ class PhotoshootsViewSet(viewsets.ViewSet):
             return Response(read_serializer.data, status=status.HTTP_201_CREATED)
         return Response(write_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-    def delete(self, request, pk=None):
-        photoshoot = Photoshoot.objects.get(pk=pk)
-        photoshoot.delete()
-        return Response(status=status.HTTP_204_NO_CONTENT)
-
     @action(detail=False, methods=['patch'], url_path='cancel')
     def cancel_photoshoot(self, request, pk=None):
-        photoshoot = Photoshoot.objects.get(pk=pk)
+        id = self.request.GET.get('id', '')
+        try:
+            photoshoot = Photoshoot.objects.get(id=id)
+        except Photoshoot.DoesNotExist:
+            return Response('Photoshoot not found', status=status.HTTP_404_NOT_FOUND)
         if photoshoot.photoshoot_status != Photoshoot.CANCELED:
             if photoshoot.photoshoot_status == Photoshoot.CREATED or photoshoot.photoshoot_status == Photoshoot.ACCEPTED:
                 photoshoot.photoshoot_status = Photoshoot.CANCELED
                 photoshoot.save()
+                return Response(status=status.HTTP_200_OK)
             else:
-                return Response('Photoshoot status should equal' + str(Photoshoot.CREATED) + " or " + str(Photoshoot.ACCEPTED),
+                return Response('Photoshoot status should equal ' + str(Photoshoot.CREATED) + " or " + str(Photoshoot.ACCEPTED),
                                 status=status.HTTP_400_BAD_REQUEST)
-
+        else:
+            return Response(status=status.HTTP_200_OK)
 
     @action(detail=False, methods=['patch'], url_path='accept')
     def accept_photoshoot(self, request, pk=None):
-        photoshoot = Photoshoot.objects.get(pk=pk)
+        id = self.request.GET.get('id', '')
+        try:
+            photoshoot = Photoshoot.objects.get(id=id)
+        except Photoshoot.DoesNotExist:
+            return Response('Photoshoot not found', status=status.HTTP_404_NOT_FOUND)
         if photoshoot.photoshoot_status != Photoshoot.ACCEPTED:
             if photoshoot.photoshoot_status == Photoshoot.CREATED:
                 photoshoot.photoshoot_status = Photoshoot.ACCEPTED
                 photoshoot.save()
+                return Response(status=status.HTTP_200_OK)
             else:
-                return Response('Photoshoot status should equal' + str(Photoshoot.CREATED),
+                return Response('Photoshoot status should equal ' + str(Photoshoot.CREATED),
                                 status=status.HTTP_400_BAD_REQUEST)
+        else:
+            return Response(status=status.HTTP_200_OK)
 
     @action(detail=False, methods=['patch'], url_path='end')
     def end_photoshoot(self, request, pk=None):
-        photoshoot = Photoshoot.objects.get(pk=pk)
+        id = self.request.GET.get('id', '')
+        try:
+            photoshoot = Photoshoot.objects.get(id=id)
+        except Photoshoot.DoesNotExist:
+            return Response('Photoshoot not found', status=status.HTTP_404_NOT_FOUND)
         if photoshoot.photoshoot_status != Photoshoot.ENDED:
             if photoshoot.photoshoot_status == Photoshoot.ACCEPTED:
                 photoshoot.photoshoot_status = Photoshoot.ENDED
                 photoshoot.save()
+                return Response(status=status.HTTP_200_OK)
             else:
-                return Response('Photoshoot status should equal' + str(Photoshoot.ACCEPTED),
+                return Response('Photoshoot status should equal ' + str(Photoshoot.ACCEPTED),
                                 status=status.HTTP_400_BAD_REQUEST)
+        else:
+            return Response(status=status.HTTP_200_OK)
 
-    @action(detail=False, methods=['get'], url_path='all')
-    def retrieve_by_user(self, request):
-        user = self.request.GET.get('username', '')
-        photoshoots = list(Photoshoot.objects.filter(inviting_user__username=user))
-        photoshoots.append(list(Photoshoot.objects.filter(invited_user__username=user)))
-        serializer = PhotoshootReaderSerializer(photoshoots, many=True)
+
+class ModelsViewSet(viewsets.ViewSet):
+
+    def retrieve(self, request, pk=None):
+        model = Model.objects.get(pk=pk)
+        serializer = ModelSerializer(model)
         return Response(serializer.data)
+
+    @action(detail=False, methods=['get'], url_path='email')
+    def retrieve_by_email(self, request):
+        email = self.request.GET.get('email', '')
+        try:
+            user = User.objects.filter(email=email).first()
+            model = Model.objects.filter(user_id=user.id).first()
+        except Model.DoesNotExist:
+            return Response('Model not found', status=status.HTTP_404_NOT_FOUND)
+        serializer = ModelSerializer(model)
+        return Response(serializer.data)
+
+    def list(self, request):
+        queryset = Model.objects.all()
+        serializer = ModelSerializer(queryset, many=True)
+        return Response(serializer.data)
+
+    @transaction.atomic
+    def create(self, request, *args, **kwargs):
+        data = self.request.data
+        register_serializer = RegisterSerializer(data=data)
+        try:
+            with transaction.atomic():
+                if register_serializer.is_valid():
+                    new_user = register_serializer.save(request)
+                    new_user.role = User.MODEL
+                    new_user.save()
+                else:
+                    return Response(register_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+                survey_serializer = SurveyWriterSerializer(data=data)
+                if survey_serializer.is_valid():
+                    new_survey = survey_serializer.save()
+                else:
+                    return Response(survey_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+                new_model = Model.objects.create(user=new_user, survey=new_survey)
+                new_model.save()
+                model = ModelSerializer(new_model)
+                return Response(model.data, status=status.HTTP_201_CREATED)
+        except IntegrityError:
+            return Response(IntegrityError, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(detail=False, methods=['post'], url_path='instagram')
+    def instagram(self, request, pk=None):
+        pk = self.request.GET.get('pk', '')
+        try:
+            model = Model.objects.get(pk=pk)
+        except Model.DoesNotExist:
+            return Response('Model not found', status=status.HTTP_404_NOT_FOUND)
+        survey = model.survey
+        data = self.request.data
+        survey.instagram_name = data["instagram_name"]
+        survey.save()
+        return Response(status=status.HTTP_200_OK)
+
+    @action(detail=False, methods=['post'], url_path='add')
+    def additional_information(self, request, pk=None):
+        pk = self.request.GET.get('pk', '')
+        try:
+            model = Model.objects.get(pk=pk)
+        except Model.DoesNotExist:
+            return Response('Model not found', status=status.HTTP_404_NOT_FOUND)
+        data = self.request.data
+        model.eyes_color = data["eyes_color"]
+        model.hair_color = data["hair_color"]
+        model.save()
+        return Response(status=status.HTTP_200_OK)
+
+    #def update(self, request, pk=None):
+    #    model = Model.objects.get(pk=pk)
+    #    write_serializer = ModelSerializer(model, data=request.data)
+    #    if write_serializer.is_valid():
+    #        model = write_serializer.save()
+    #        read_serializer = ModelSerializer(model)
+    #        return Response(read_serializer.data, status=status.HTTP_201_CREATED)
+    #    return Response(write_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    @transaction.atomic
+    def destroy(self, request, pk=None):
+        try:
+            with transaction.atomic():
+                try:
+                    model = Model.objects.get(pk=pk)
+                except Model.DoesNotExist:
+                    return Response('Model not found', status=status.HTTP_404_NOT_FOUND)
+                survey = model.survey
+                user = model.user
+                user.delete()
+                survey.delete()
+                model.delete()
+                return Response(status=status.HTTP_204_NO_CONTENT)
+        except IntegrityError:
+            return Response(IntegrityError, status=status.HTTP_400_BAD_REQUEST)
 
 
 class PhotographersViewSet(viewsets.ViewSet):
 
     def retrieve(self, request, pk=None):
         photographer = Photographer.objects.get(pk=pk)
-        serializer = PhotographerReaderSerializer(photographer)
+        serializer = PhotographerSerializer(photographer)
+        return Response(serializer.data)
+
+    @action(detail=False, methods=['get'], url_path='email')
+    def retrieve_by_email(self, request):
+        email = self.request.GET.get('email', '')
+        try:
+            user = User.objects.filter(email=email).first()
+            photographer = Photographer.objects.filter(user_id=user.id).first()
+        except Photographer.DoesNotExist:
+            return Response('Photographer not found', status=status.HTTP_404_NOT_FOUND)
+        serializer = PhotographerSerializer(photographer)
         return Response(serializer.data)
 
     def list(self, request):
         queryset = Photographer.objects.all()
-        serializer = PhotographerReaderSerializer(queryset, many=True)
+        serializer = PhotographerSerializer(queryset, many=True)
         return Response(serializer.data)
 
+    @transaction.atomic
     def create(self, request, *args, **kwargs):
-        write_serializer = PhotographerWriterSerializer(data=request.data)
-        if write_serializer.is_valid():
-            photographer = write_serializer.save()
-            read_serializer = PhotographerReaderSerializer(photographer)
-            return Response(read_serializer.data, status=status.HTTP_201_CREATED)
-        return Response(write_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        data = self.request.data
+        register_serializer = RegisterSerializer(data=data)
+        try:
+            with transaction.atomic():
+                if register_serializer.is_valid():
+                    new_user = register_serializer.save(request)
+                    new_user.role = User.PHOTOGRAPHER
+                    new_user.save()
+                else:
+                    return Response(register_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+                survey_serializer = SurveyWriterSerializer(data=data)
+                if survey_serializer.is_valid():
+                    new_survey = survey_serializer.save()
+                else:
+                    return Response(survey_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+                new_photographer = Photographer.objects.create(user=new_user, survey=new_survey)
+                new_photographer.save()
+                photographer = PhotographerSerializer(new_photographer)
+                return Response(photographer.data, status=status.HTTP_201_CREATED)
+        except IntegrityError:
+            return Response(IntegrityError, status=status.HTTP_400_BAD_REQUEST)
 
-    def update(self, request, pk=None):
-        photographer = Photographer.objects.get(pk=pk)
-        write_serializer = PhotographerWriterSerializer(photographer, data=request.data)
-        if write_serializer.is_valid():
-            photographer = write_serializer.save()
-            read_serializer = PhotographerReaderSerializer(photographer)
-            return Response(read_serializer.data, status=status.HTTP_201_CREATED)
-        return Response(write_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    @action(detail=False, methods=['post'], url_path='instagram')
+    def instagram(self, request, pk=None):
+        pk = self.request.GET.get('pk', '')
+        try:
+            photographer = Photographer.objects.get(pk=pk)
+        except Photographer.DoesNotExist:
+            return Response('Photographer not found', status=status.HTTP_404_NOT_FOUND)
+        survey = photographer.survey
+        data = self.request.data
+        survey.instagram_name = data["instagram_name"]
+        survey.save()
+        return Response(status=status.HTTP_200_OK)
 
-    def delete(self, request, pk=None):
-        photographer = Photographer.objects.get(pk=pk)
-        photographer.delete()
-        return Response(status=status.HTTP_204_NO_CONTENT)
+    #def update(self, request, pk=None):
+    #    photographer = Photographer.objects.get(pk=pk)
+    #    write_serializer = PhotographerSerializer(photographer, data=request.data)
+    #    if write_serializer.is_valid():
+    #        photographer = write_serializer.save()
+    #        read_serializer = PhotographerSerializer(photographer)
+    #        return Response(read_serializer.data, status=status.HTTP_201_CREATED)
+    #    return Response(write_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    @transaction.atomic
+    def destroy(self, request, pk=None):
+        try:
+            with transaction.atomic():
+                try:
+                    photographer = Photographer.objects.get(pk=pk)
+                except Model.DoesNotExist:
+                    return Response('Photographer not found', status=status.HTTP_404_NOT_FOUND)
+                survey = photographer.survey
+                user = photographer.user
+                user.delete()
+                survey.delete()
+                photographer.delete()
+                return Response(status=status.HTTP_204_NO_CONTENT)
+        except IntegrityError:
+            return Response(IntegrityError, status=status.HTTP_400_BAD_REQUEST)
 
 
 class SurveysViewSet(viewsets.ViewSet):
@@ -402,6 +582,7 @@ class SurveysViewSet(viewsets.ViewSet):
 
     @action(detail=False, methods=['post'], url_path='instagram')
     def set_instagram_name(self, request, pk=None):
+        pk = self.request.GET.get('pk', '')
         try:
             survey = Survey.objects.get(pk=pk)
         except Survey.DoesNotExist:
@@ -411,10 +592,11 @@ class SurveysViewSet(viewsets.ViewSet):
         survey.save()
         return Response(status=status.HTTP_200_OK)
 
-    def delete(self, request, pk=None):
+    def destroy(self, request, pk=None):
         survey = Survey.objects.get(pk=pk)
         survey.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
+
 
 class UsersViewSet(viewsets.ViewSet):
 
@@ -462,7 +644,7 @@ class UsersViewSet(viewsets.ViewSet):
             user.update(main_photo_url = request.data["fileUrl"])
             return Response(user, status=status.HTTP_200_OK)
 
-    def delete(self, request, pk=None):
+    def destroy(self, request, pk=None):
         user = User.objects.get(pk=pk)
         user.delete()
         #TODO usuniecie wszystkiego co zwiazane z Userem
