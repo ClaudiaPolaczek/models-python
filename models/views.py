@@ -2,42 +2,42 @@ from django.db import transaction, IntegrityError
 import operator
 from django.db.models import Q
 
-from .models import Notification, Image, Portfolio, Comment, User
 from rest_framework import viewsets, status, permissions
 from rest_framework.response import Response
 from rest_framework.decorators import action
-from django.shortcuts import get_object_or_404
-from django.views.decorators.csrf import csrf_exempt
 from .serializers import *
 
 
 class NotificationsViewSet(viewsets.ViewSet):
 
     def retrieve(self, request, pk=None):
-        notification = Notification.objects.get(pk=pk)
+        try:
+            notification = Notification.objects.get(pk=pk)
+        except Notification.DoesNotExist:
+            return Response('Notification not found', status=status.HTTP_404_NOT_FOUND)
         serializer = NotificationReaderSerializer(notification)
         return Response(serializer.data)
 
-    @action(detail=False, methods=['get'])
+    @action(detail=False, methods=['get'], url_path='user')
     def retrieve_by_user(self, request):
-        user = self.request.GET.get('username', '')
+        email = self.request.GET.get('email', '')
         try:
-            notification = Notification.objects.filter(user_username=user)
-        except Notification.DoesNotExist:
-            return Response('Notifications not found', status=status.HTTP_404_NOT_FOUND)
-
-        serializer = NotificationReaderSerializer(notification)
+            user = User.objects.get(email=email)
+        except User.DoesNotExist:
+            return Response('User not found', status=status.HTTP_404_NOT_FOUND)
+        notification = Notification.objects.filter(user_id=user.id)
+        serializer = NotificationReaderSerializer(notification, many=True)
         return Response(serializer.data)
 
     @action(detail=False, methods=['get'], url_path='n')
     def retrieve_non_read_by_user(self, request):
-        user = self.request.GET.get('username', '')
+        email = self.request.GET.get('email', '')
         try:
-            notification = Notification.objects.filter(user_username=user, read_value=0)
-        except Notification.DoesNotExist:
-            return Response('Notifications not found', status=status.HTTP_404_NOT_FOUND)
-
-        serializer = NotificationReaderSerializer(notification)
+            user = User.objects.get(email=email)
+        except User.DoesNotExist:
+            return Response('User not found', status=status.HTTP_404_NOT_FOUND)
+        notification = Notification.objects.filter(user_id=user.id, read_value=0)
+        serializer = NotificationReaderSerializer(notification, many=True)
         return Response(serializer.data)
 
     @action(detail=False, methods=['patch'], url_path='read')
@@ -65,7 +65,10 @@ class NotificationsViewSet(viewsets.ViewSet):
         return Response(write_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     def delete(self, request, pk=None):
-        notification = Notification.objects.get(pk=pk)
+        try:
+            notification = Notification.objects.get(pk=pk)
+        except Notification.DoesNotExist:
+            return Response('Notification not found', status=status.HTTP_404_NOT_FOUND)
         notification.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
@@ -73,18 +76,22 @@ class NotificationsViewSet(viewsets.ViewSet):
 class ImagesViewSet(viewsets.ViewSet):
 
     def retrieve(self, request, pk=None):
-        image = Image.objects.get(pk=pk)
+        try:
+            image = Image.objects.get(pk=pk)
+        except Image.DoesNotExist:
+            return Response('Image not found', status=status.HTTP_404_NOT_FOUND)
         serializer = ImageReaderSerializer(image)
         return Response(serializer.data)
 
-    @action(detail=False, methods=['get'],)
+    @action(detail=False, methods=['get'], url_path='portfolio')
     def retrieve_by_portfolio(self, request):
-        portfolio = self.request.GET.get('portfolio', '')
+        portfolio_id = self.request.GET.get('portfolio', '')
         try:
-            image = Image.objects.filter(portfolio_id=portfolio)
-        except Image.DoesNotExist:
-            return Response('Images not found', status=status.HTTP_404_NOT_FOUND)
-        serializer = ImageReaderSerializer(image, many=True)
+            portfolio = Portfolio.objects.get(id=portfolio_id )
+        except Portfolio.DoesNotExist:
+            return Response('Portfolio not found', status=status.HTTP_404_NOT_FOUND)
+        images = Image.objects.filter(portfolio_id=portfolio.id)
+        serializer = ImageReaderSerializer(images, many=True)
         return Response(serializer.data)
 
     def list(self, request):
@@ -120,17 +127,21 @@ class ImagesViewSet(viewsets.ViewSet):
 class PortfolioViewSet(viewsets.ViewSet):
 
     def retrieve(self, request, pk=None):
-        portfolio = Portfolio.objects.get(pk=pk)
+        try:
+            portfolio = Portfolio.objects.get(pk=pk)
+        except Portfolio.DoesNotExist:
+            return Response('Portfolio not found', status=status.HTTP_404_NOT_FOUND)
         serializer = PortfolioReaderSerializer(portfolio)
         return Response(serializer.data)
 
-    @action(detail=False, methods=['get'])
+    @action(detail=False, methods=['get'], url_path='user')
     def retrieve_by_user(self, request):
-        username = self.request.GET.get('user', '')
+        email = self.request.GET.get('email', '')
         try:
-            portfolio = Portfolio.objects.filter(user__username=username)
-        except Portfolio.DoesNotExist:
-            return Response('Images not found', status=status.HTTP_404_NOT_FOUND)
+            user = User.objects.get(email=email)
+        except User.DoesNotExist:
+            return Response('User not found', status=status.HTTP_404_NOT_FOUND)
+        portfolio = Portfolio.objects.filter(user_id=user.id)
         serializer = PortfolioReaderSerializer(portfolio, many=True)
         return Response(serializer.data)
 
@@ -171,7 +182,10 @@ class PortfolioViewSet(viewsets.ViewSet):
         return Response(status=status.HTTP_200_OK)
 
     def delete(self, request, pk=None):
-        portfolio = Portfolio.objects.get(pk=pk)
+        try:
+            portfolio = Portfolio.objects.get(pk=pk)
+        except Portfolio.DoesNotExist:
+            return Response('Portfolio not found', status=status.HTTP_404_NOT_FOUND)
         portfolio.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
@@ -179,28 +193,34 @@ class PortfolioViewSet(viewsets.ViewSet):
 class CommentsViewSet(viewsets.ViewSet):
 
     def retrieve(self, request, pk=None):
-        comment = Comment.objects.get(pk=pk)
+        try:
+            comment = Comment.objects.get(pk=pk)
+        except Comment.DoesNotExist:
+            return Response('Comment not found', status=status.HTTP_404_NOT_FOUND)
         serializer = CommentReaderSerializer(comment)
         return Response(serializer.data)
 
     @action(detail=False, methods=['get'], url_path='rating')
     def retrieve_by_rating_user(self, request):
-        user = self.request.GET.get('email', '')
+        email = self.request.GET.get('email', '')
         try:
-            comment = Comment.objects.filter(rating_user__email=user)
-        except Comment.DoesNotExist:
-            return Response('Comments not found', status=status.HTTP_404_NOT_FOUND)
-        serializer = CommentReaderSerializer(comment, many=True)
+            user = User.objects.get(email=email)
+        except User.DoesNotExist:
+            return Response('User not found', status=status.HTTP_404_NOT_FOUND)
+        comments = Comment.objects.filter(rating_user__id=user.id)
+        serializer = CommentReaderSerializer(comments, many=True)
         return Response(serializer.data)
+
 
     @action(detail=False, methods=['get'], url_path='rated')
     def retrieve_by_rated_user(self, request):
-        user = self.request.GET.get('email', '')
+        email = self.request.GET.get('email', '')
         try:
-            comment = Comment.objects.filter(rated_user__email=user)
-        except Comment.DoesNotExist:
-            return Response('Comments not found', status=status.HTTP_404_NOT_FOUND)
-        serializer = CommentReaderSerializer(comment, many=True)
+            user = User.objects.get(email=email)
+        except User.DoesNotExist:
+            return Response('User not found', status=status.HTTP_404_NOT_FOUND)
+        comments = Comment.objects.filter(rated_user__id=user)
+        serializer = CommentReaderSerializer(comments, many=True)
         return Response(serializer.data)
 
     @action(detail=False, methods=['get'], url_path='users')
@@ -215,10 +235,8 @@ class CommentsViewSet(viewsets.ViewSet):
             user_rated = User.objects.filter(email=user_rated_email).first()
         except User.DoesNotExist:
             return Response('User not found', status=status.HTTP_404_NOT_FOUND)
-        try:
-            comments = Comment.objects.filter(rating_user__id=user_rating.id, rated_user__id=user_rated.id)
-        except Comment.DoesNotExist:
-            return Response('Comments not found', status=status.HTTP_404_NOT_FOUND)
+        comments = Comment.objects.filter(rating_user__id=user_rating.id, rated_user__id=user_rated.id)
+        return Response('Comments not found', status=status.HTTP_404_NOT_FOUND)
         serializer = CommentReaderSerializer(comments, many=True)
         return Response(serializer.data)
 
@@ -256,7 +274,10 @@ class CommentsViewSet(viewsets.ViewSet):
         return Response(write_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     def delete(self, request, pk=None):
-        comment = Comment.objects.get(pk=pk)
+        try:
+            comment = Comment.objects.get(pk=pk)
+        except Comment.DoesNotExist:
+            return Response('Comment not found', status=status.HTTP_404_NOT_FOUND)
         comment.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
@@ -264,27 +285,33 @@ class CommentsViewSet(viewsets.ViewSet):
 class PhotoshootsViewSet(viewsets.ViewSet):
 
     def retrieve(self, request, pk=None):
-        photoshoot = Photoshoot.objects.get(pk=pk)
+        try:
+            photoshoot = Photoshoot.objects.get(pk=pk)
+        except Photoshoot.DoesNotExist:
+            return Response('Photoshoot not found', status=status.HTTP_404_NOT_FOUND)
         serializer = PhotoshootReaderSerializer(photoshoot)
         return Response(serializer.data)
 
     @action(detail=False, methods=['get'], url_path='inviting')
     def retrieve_by_inviting_user(self, request):
-        user = self.request.GET.get('email', '')
+        email = self.request.GET.get('email', '')
         try:
-            photoshoot = Photoshoot.objects.filter(inviting_user__email=user)
-        except Photoshoot.DoesNotExist:
-            return Response('Photoshoots not found', status=status.HTTP_404_NOT_FOUND)
+            user = User.objects.get(email=email)
+        except User.DoesNotExist:
+            return Response('User not found', status=status.HTTP_404_NOT_FOUND)
+        photoshoot = Photoshoot.objects.filter(inviting_user__id=user.id)
         serializer = PhotoshootReaderSerializer(photoshoot, many=True)
         return Response(serializer.data)
 
+
     @action(detail=False, methods=['get'], url_path='invited')
     def retrieve_by_invited_user(self, request):
-        user = self.request.GET.get('email', '')
+        email = self.request.GET.get('email', '')
         try:
-            photoshoot = Photoshoot.objects.filter(invited_user__email=user)
-        except Comment.DoesNotExist:
-            return Response('Photoshoots not found', status=status.HTTP_404_NOT_FOUND)
+            user = User.objects.get(email=email)
+        except User.DoesNotExist:
+            return Response('User not found', status=status.HTTP_404_NOT_FOUND)
+        photoshoot = Photoshoot.objects.filter(invited_user__id=user.id)
         serializer = PhotoshootReaderSerializer(photoshoot, many=True)
         return Response(serializer.data)
 
@@ -359,7 +386,10 @@ class PhotoshootsViewSet(viewsets.ViewSet):
 class ModelsViewSet(viewsets.ViewSet):
 
     def retrieve(self, request, pk=None):
-        model = Model.objects.get(pk=pk)
+        try:
+            model = Model.objects.get(pk=pk)
+        except Model.DoesNotExist:
+            return Response('Model not found', status=status.HTTP_404_NOT_FOUND)
         serializer = ModelSerializer(model)
         return Response(serializer.data)
 
@@ -404,7 +434,7 @@ class ModelsViewSet(viewsets.ViewSet):
             return Response(IntegrityError, status=status.HTTP_400_BAD_REQUEST)
 
     @action(detail=False, methods=['post'], url_path='instagram')
-    def instagram(self, request, pk=None):
+    def instagram(self, request):
         pk = self.request.GET.get('pk', '')
         try:
             model = Model.objects.get(pk=pk)
@@ -417,7 +447,7 @@ class ModelsViewSet(viewsets.ViewSet):
         return Response(status=status.HTTP_200_OK)
 
     @action(detail=False, methods=['post'], url_path='add')
-    def additional_information(self, request, pk=None):
+    def additional_information(self, request):
         pk = self.request.GET.get('pk', '')
         try:
             model = Model.objects.get(pk=pk)
@@ -459,7 +489,10 @@ class ModelsViewSet(viewsets.ViewSet):
 class PhotographersViewSet(viewsets.ViewSet):
 
     def retrieve(self, request, pk=None):
-        photographer = Photographer.objects.get(pk=pk)
+        try:
+            photographer = Photographer.objects.get(pk=pk)
+        except Photographer.DoesNotExist:
+            return Response('Photographer not found', status=status.HTTP_404_NOT_FOUND)
         serializer = PhotographerSerializer(photographer)
         return Response(serializer.data)
 
@@ -531,7 +564,7 @@ class PhotographersViewSet(viewsets.ViewSet):
             with transaction.atomic():
                 try:
                     photographer = Photographer.objects.get(pk=pk)
-                except Model.DoesNotExist:
+                except Photographer.DoesNotExist:
                     return Response('Photographer not found', status=status.HTTP_404_NOT_FOUND)
                 survey = photographer.survey
                 user = photographer.user
@@ -546,7 +579,10 @@ class PhotographersViewSet(viewsets.ViewSet):
 class SurveysViewSet(viewsets.ViewSet):
 
     def retrieve(self, request, pk=None):
-        survey = Survey.objects.get(pk=pk)
+        try:
+            survey = Survey.objects.get(pk=pk)
+        except Survey.DoesNotExist:
+            return Response('Survey not found', status=status.HTTP_404_NOT_FOUND)
         serializer = SurveyReaderSerializer(survey)
         return Response(serializer.data)
 
@@ -593,7 +629,10 @@ class SurveysViewSet(viewsets.ViewSet):
         return Response(status=status.HTTP_200_OK)
 
     def destroy(self, request, pk=None):
-        survey = Survey.objects.get(pk=pk)
+        try:
+            survey = Survey.objects.get(pk=pk)
+        except Survey.DoesNotExist:
+            return Response('Survey not found', status=status.HTTP_404_NOT_FOUND)
         survey.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
@@ -645,7 +684,10 @@ class UsersViewSet(viewsets.ViewSet):
             return Response(user, status=status.HTTP_200_OK)
 
     def destroy(self, request, pk=None):
-        user = User.objects.get(pk=pk)
+        try:
+            user = User.objects.get(pk=pk)
+        except User.DoesNotExist:
+            return Response('User not found', status=status.HTTP_404_NOT_FOUND)
         user.delete()
         #TODO usuniecie wszystkiego co zwiazane z Userem
         return Response(status=status.HTTP_204_NO_CONTENT)

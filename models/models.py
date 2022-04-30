@@ -34,17 +34,12 @@ class Photographer(models.Model):
     user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
     survey = models.OneToOneField(Survey, on_delete=models.CASCADE)
 
-    def delete(self, *args, **kwargs):
-        self.survey.delete()
-        self.user.delete()
-        return super(self.__class__, self).delete(*args, **kwargs)
-
 
 class Notification(models.Model):
     added_date = models.DateTimeField()
     content = models.TextField(max_length=500)
     read_value = models.IntegerField()
-    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True)
+    user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
 
     def save(self, *args, **kwargs):
         if not self.id:
