@@ -23,3 +23,16 @@ class CustomUser(AbstractUser):
 
     def __str__(self):
         return self.email
+
+    def has_perm(self, perm, obj=None):
+        return True
+
+    def has_module_perms(self, models):
+        return True
+
+    @property
+    def is_staff(self):
+        if self.role == CustomUser.ADMIN:
+            return True
+        else:
+            return False

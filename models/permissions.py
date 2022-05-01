@@ -10,3 +10,11 @@ class UserAccessPermission(permissions.BasePermission):
             return True
         else:
             return False
+
+class IsAdmin(permissions.BasePermission):
+
+    def has_permission(self, request, view):
+        if 'A' == request.user.role:
+            return True
+        else:
+            return False

@@ -1,7 +1,7 @@
 from django.db import transaction, IntegrityError
 import operator
 from django.db.models import Q
-
+from .permissions import UserAccessPermission, IsAdmin
 from rest_framework import viewsets, status, permissions
 from rest_framework.response import Response
 from rest_framework.decorators import action
@@ -72,6 +72,15 @@ class NotificationsViewSet(viewsets.ViewSet):
         notification.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
+    def get_permissions(self):
+        if self.action == 'retrieve':
+            permission_classes = [permissions.IsAuthenticated]
+        elif self.action in ('retrieve_by_user', 'retrieve_non_read_by_user', 'read', 'list', 'create', 'delete'):
+            permission_classes = [permissions.IsAuthenticated]
+        else:
+            permission_classes = [permissions.IsAdmin]
+        return [permission() for permission in permission_classes]
+
 
 class ImagesViewSet(viewsets.ViewSet):
 
@@ -122,6 +131,15 @@ class ImagesViewSet(viewsets.ViewSet):
         for image in images:
             image.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+    def get_permissions(self):
+        if self.action == 'retrieve':
+            permission_classes = [permissions.IsAuthenticated]
+        elif self.action in ('retrieve_by_portfolio', 'list', 'delete_by_url', 'create', 'delete'):
+            permission_classes = [permissions.IsAuthenticated]
+        else:
+            permission_classes = [permissions.IsAdmin]
+        return [permission() for permission in permission_classes]
 
 
 class PortfolioViewSet(viewsets.ViewSet):
@@ -189,6 +207,15 @@ class PortfolioViewSet(viewsets.ViewSet):
         portfolio.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
+    def get_permissions(self):
+        if self.action == 'retrieve':
+            permission_classes = [permissions.IsAuthenticated]
+        elif self.action in ('retrieve_by_user', 'list', 'partial_update', 'create', 'delete', 'add_main_photo'):
+            permission_classes = [permissions.IsAuthenticated]
+        else:
+            permission_classes = [permissions.IsAdmin]
+        return [permission() for permission in permission_classes]
+
 
 class CommentsViewSet(viewsets.ViewSet):
 
@@ -210,7 +237,6 @@ class CommentsViewSet(viewsets.ViewSet):
         comments = Comment.objects.filter(rating_user__id=user.id)
         serializer = CommentReaderSerializer(comments, many=True)
         return Response(serializer.data)
-
 
     @action(detail=False, methods=['get'], url_path='rated')
     def retrieve_by_rated_user(self, request):
@@ -281,6 +307,16 @@ class CommentsViewSet(viewsets.ViewSet):
         comment.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
+    def get_permissions(self):
+        if self.action == 'retrieve':
+            permission_classes = [permissions.IsAuthenticated]
+        elif self.action in ('retrieve_by_rating_user', 'retrieve_by_rated_user',
+                             'retrieve_by_rating_and_rated_user', 'get_average_for_users', 'list', 'create'):
+            permission_classes = [permissions.IsAuthenticated]
+        else:
+            permission_classes = [permissions.IsAdmin]
+        return [permission() for permission in permission_classes]
+
 
 class PhotoshootsViewSet(viewsets.ViewSet):
 
@@ -302,7 +338,6 @@ class PhotoshootsViewSet(viewsets.ViewSet):
         photoshoot = Photoshoot.objects.filter(inviting_user__id=user.id)
         serializer = PhotoshootReaderSerializer(photoshoot, many=True)
         return Response(serializer.data)
-
 
     @action(detail=False, methods=['get'], url_path='invited')
     def retrieve_by_invited_user(self, request):
@@ -381,6 +416,17 @@ class PhotoshootsViewSet(viewsets.ViewSet):
                                 status=status.HTTP_400_BAD_REQUEST)
         else:
             return Response(status=status.HTTP_200_OK)
+
+    def get_permissions(self):
+        if self.action == 'retrieve':
+            permission_classes = [permissions.IsAuthenticated]
+        elif self.action in ('retrieve_by_inviting_user', 'retrieve_by_invited_user',
+                             'cancel_photoshoot', 'get_average_for_users', 'end_photoshoot',
+                             'list', 'create'):
+            permission_classes = [permissions.IsAuthenticated]
+        else:
+            permission_classes = [permissions.IsAdmin]
+        return [permission() for permission in permission_classes]
 
 
 class ModelsViewSet(viewsets.ViewSet):
@@ -485,6 +531,16 @@ class ModelsViewSet(viewsets.ViewSet):
         except IntegrityError:
             return Response(IntegrityError, status=status.HTTP_400_BAD_REQUEST)
 
+    def get_permissions(self):
+        if self.action == 'retrieve':
+            permission_classes = [permissions.IsAuthenticated]
+        elif self.action in ('retrieve_by_email', 'list',
+                             'create', 'instagram', 'additional_information'):
+            permission_classes = [permissions.IsAuthenticated]
+        else:
+            permission_classes = [IsAdmin]
+        return [permission() for permission in permission_classes]
+
 
 class PhotographersViewSet(viewsets.ViewSet):
 
@@ -575,6 +631,16 @@ class PhotographersViewSet(viewsets.ViewSet):
         except IntegrityError:
             return Response(IntegrityError, status=status.HTTP_400_BAD_REQUEST)
 
+    def get_permissions(self):
+        if self.action == 'retrieve':
+            permission_classes = [permissions.IsAuthenticated]
+        elif self.action in ('retrieve_by_email', 'list',
+                             'create', 'instagram'):
+            permission_classes = [permissions.IsAuthenticated]
+        else:
+            permission_classes = [permissions.IsAdmin]
+        return [permission() for permission in permission_classes]
+
 
 class SurveysViewSet(viewsets.ViewSet):
 
@@ -636,6 +702,16 @@ class SurveysViewSet(viewsets.ViewSet):
         survey.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
+    def get_permissions(self):
+        if self.action == 'retrieve':
+            permission_classes = [permissions.IsAuthenticated]
+        elif self.action in ('partial_update', 'list',
+                             'create', 'set_instagram_name'):
+            permission_classes = [permissions.IsAuthenticated]
+        else:
+            permission_classes = [permissions.IsAdmin]
+        return [permission() for permission in permission_classes]
+
 
 class UsersViewSet(viewsets.ViewSet):
 
@@ -691,3 +767,12 @@ class UsersViewSet(viewsets.ViewSet):
         user.delete()
         #TODO usuniecie wszystkiego co zwiazane z Userem
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+    def get_permissions(self):
+        if self.action == 'retrieve':
+            permission_classes = [permissions.IsAuthenticated]
+        elif self.action in ('retrieve_by_username', 'retrieve_by_email', 'list', 'add_main_photo'):
+            permission_classes = [permissions.IsAuthenticated]
+        else:
+            permission_classes = [permissions.IsAdmin]
+        return [permission() for permission in permission_classes]
