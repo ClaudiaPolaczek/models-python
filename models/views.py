@@ -350,6 +350,8 @@ class PhotoshootsViewSet(viewsets.ViewSet):
         serializer = PhotoshootReaderSerializer(photoshoot, many=True)
         return Response(serializer.data)
 
+    #TODO retrieve by user
+
     def list(self, request):
         queryset = Photoshoot.objects.all()
         serializer = PhotoshootReaderSerializer(queryset, many=True)
@@ -532,9 +534,9 @@ class ModelsViewSet(viewsets.ViewSet):
             return Response(IntegrityError, status=status.HTTP_400_BAD_REQUEST)
 
     def get_permissions(self):
-        if self.action == 'retrieve':
-            permission_classes = [permissions.IsAuthenticated]
-        elif self.action in ('retrieve_by_email', 'list',
+        if self.action == 'create':
+            permission_classes = [permissions.AllowAny]
+        elif self.action in ('retrieve', 'retrieve_by_email', 'list',
                              'create', 'instagram', 'additional_information'):
             permission_classes = [permissions.IsAuthenticated]
         else:
@@ -632,9 +634,9 @@ class PhotographersViewSet(viewsets.ViewSet):
             return Response(IntegrityError, status=status.HTTP_400_BAD_REQUEST)
 
     def get_permissions(self):
-        if self.action == 'retrieve':
-            permission_classes = [permissions.IsAuthenticated]
-        elif self.action in ('retrieve_by_email', 'list',
+        if self.action == 'create':
+            permission_classes = [permissions.AllowAny]
+        elif self.action in ('retrieve', 'retrieve_by_email', 'list',
                              'create', 'instagram'):
             permission_classes = [permissions.IsAuthenticated]
         else:
