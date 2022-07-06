@@ -1,10 +1,12 @@
 from django.db import transaction, IntegrityError
 import operator
 from django.db.models import Q
+from rest_framework.parsers import MultiPartParser, FormParser
+
 from .permissions import UserAccessPermission, IsAdmin
 from rest_framework import viewsets, status, permissions
 from rest_framework.response import Response
-from rest_framework.decorators import action
+from rest_framework.decorators import action, permission_classes
 from .serializers import *
 
 
@@ -78,7 +80,7 @@ class NotificationsViewSet(viewsets.ViewSet):
         elif self.action in ('retrieve_by_user', 'retrieve_non_read_by_user', 'read', 'list', 'create', 'delete'):
             permission_classes = [permissions.IsAuthenticated]
         else:
-            permission_classes = [permissions.IsAdmin]
+            permission_classes = [IsAdmin]
         return [permission() for permission in permission_classes]
 
 
@@ -199,7 +201,7 @@ class PortfolioViewSet(viewsets.ViewSet):
         portfolio.save()
         return Response(status=status.HTTP_200_OK)
 
-    def delete(self, request, pk=None):
+    def destroy(self, request, pk=None):
         try:
             portfolio = Portfolio.objects.get(pk=pk)
         except Portfolio.DoesNotExist:
@@ -210,10 +212,12 @@ class PortfolioViewSet(viewsets.ViewSet):
     def get_permissions(self):
         if self.action == 'retrieve':
             permission_classes = [permissions.IsAuthenticated]
-        elif self.action in ('retrieve_by_user', 'list', 'partial_update', 'create', 'delete', 'add_main_photo'):
+        elif self.action == 'destroy':
+            permission_classes = [permissions.IsAuthenticated]
+        elif self.action in ('retrieve_by_user', 'list', 'partial_update', 'create', 'add_main_photo'):
             permission_classes = [permissions.IsAuthenticated]
         else:
-            permission_classes = [permissions.IsAdmin]
+            permission_classes = [IsAdmin]
         return [permission() for permission in permission_classes]
 
 
@@ -245,7 +249,7 @@ class CommentsViewSet(viewsets.ViewSet):
             user = User.objects.get(email=email)
         except User.DoesNotExist:
             return Response('User not found', status=status.HTTP_404_NOT_FOUND)
-        comments = Comment.objects.filter(rated_user__id=user)
+        comments = Comment.objects.filter(rated_user__id=user.id)
         serializer = CommentReaderSerializer(comments, many=True)
         return Response(serializer.data)
 
@@ -637,7 +641,9 @@ class PhotographersViewSet(viewsets.ViewSet):
         if self.action == 'create':
             permission_classes = [permissions.AllowAny]
         elif self.action in ('retrieve', 'retrieve_by_email', 'list',
-                             'create', 'instagram'):
+                             'create', 'instagram', 'destroy'):
+            permission_classes = [permissions.IsAuthenticated]
+        elif self.action == 'instagram':
             permission_classes = [permissions.IsAuthenticated]
         else:
             permission_classes = [permissions.IsAdmin]

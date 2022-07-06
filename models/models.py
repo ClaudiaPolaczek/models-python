@@ -40,6 +40,7 @@ class Notification(models.Model):
     content = models.TextField(max_length=500)
     read_value = models.IntegerField()
     user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    #user = models.Many(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
 
     def save(self, *args, **kwargs):
         if not self.id:
@@ -99,7 +100,7 @@ class Portfolio(models.Model):
 
 class Image(models.Model):
     portfolio = models.ForeignKey('Portfolio', on_delete=models.CASCADE)
-    file_url = models.URLField()
+    file_url = models.ImageField(upload_to="images")
     name = models.CharField(max_length=32)
     added_date = models.DateTimeField()
 

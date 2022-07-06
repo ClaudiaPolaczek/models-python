@@ -11,6 +11,7 @@ class UserAccessPermission(permissions.BasePermission):
         else:
             return False
 
+
 class IsAdmin(permissions.BasePermission):
 
     def has_permission(self, request, view):
