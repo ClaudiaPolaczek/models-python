@@ -2,7 +2,6 @@ from django.db import transaction, IntegrityError
 import operator
 from django.db.models import Q
 from rest_framework.parsers import MultiPartParser, FormParser
-
 from .permissions import UserAccessPermission, IsAdmin
 from rest_framework import viewsets, status, permissions
 from rest_framework.response import Response
@@ -66,7 +65,7 @@ class NotificationsViewSet(viewsets.ViewSet):
             return Response(read_serializer.data, status=status.HTTP_201_CREATED)
         return Response(write_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-    def delete(self, request, pk=None):
+    def destroy(self, request, pk=None):
         try:
             notification = Notification.objects.get(pk=pk)
         except Notification.DoesNotExist:
@@ -77,7 +76,7 @@ class NotificationsViewSet(viewsets.ViewSet):
     def get_permissions(self):
         if self.action == 'retrieve':
             permission_classes = [permissions.IsAuthenticated]
-        elif self.action in ('retrieve_by_user', 'retrieve_non_read_by_user', 'read', 'list', 'create', 'delete'):
+        elif self.action in ('retrieve_by_user', 'retrieve_non_read_by_user', 'read', 'list', 'create', 'destroy'):
             permission_classes = [permissions.IsAuthenticated]
         else:
             permission_classes = [IsAdmin]
@@ -118,7 +117,7 @@ class ImagesViewSet(viewsets.ViewSet):
             return Response(read_serializer.data, status=status.HTTP_201_CREATED)
         return Response(write_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-    def delete(self, request, pk=None):
+    def destroy(self, request, pk=None):
         image = Image.objects.get(pk=pk)
         image.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
@@ -137,7 +136,7 @@ class ImagesViewSet(viewsets.ViewSet):
     def get_permissions(self):
         if self.action == 'retrieve':
             permission_classes = [permissions.IsAuthenticated]
-        elif self.action in ('retrieve_by_portfolio', 'list', 'delete_by_url', 'create', 'delete'):
+        elif self.action in ('retrieve_by_portfolio', 'list', 'delete_by_url', 'create', 'destroy'):
             permission_classes = [permissions.IsAuthenticated]
         else:
             permission_classes = [permissions.IsAdmin]
@@ -303,7 +302,7 @@ class CommentsViewSet(viewsets.ViewSet):
             return Response(read_serializer.data, status=status.HTTP_201_CREATED)
         return Response(write_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-    def delete(self, request, pk=None):
+    def destroy(self, request, pk=None):
         try:
             comment = Comment.objects.get(pk=pk)
         except Comment.DoesNotExist:
@@ -315,10 +314,10 @@ class CommentsViewSet(viewsets.ViewSet):
         if self.action == 'retrieve':
             permission_classes = [permissions.IsAuthenticated]
         elif self.action in ('retrieve_by_rating_user', 'retrieve_by_rated_user',
-                             'retrieve_by_rating_and_rated_user', 'get_average_for_users', 'list', 'create'):
+                             'retrieve_by_rating_and_rated_user', 'get_average_for_users', 'list', 'create', 'destroy'):
             permission_classes = [permissions.IsAuthenticated]
         else:
-            permission_classes = [permissions.IsAdmin]
+            permission_classes = [IsAdmin]
         return [permission() for permission in permission_classes]
 
 
@@ -353,8 +352,6 @@ class PhotoshootsViewSet(viewsets.ViewSet):
         photoshoot = Photoshoot.objects.filter(invited_user__id=user.id)
         serializer = PhotoshootReaderSerializer(photoshoot, many=True)
         return Response(serializer.data)
-
-    #TODO retrieve by user
 
     def list(self, request):
         queryset = Photoshoot.objects.all()
@@ -760,12 +757,12 @@ class UsersViewSet(viewsets.ViewSet):
     def add_main_photo(self, request, pk=None):
         email = self.request.GET.get('email', '')
         try:
-            users = User.objects.filter(email=email).values()
+            user = User.objects.get(email=email)
         except User.DoesNotExist:
             return Response('User not found', status=status.HTTP_404_NOT_FOUND)
-        for user in users:
-            user.update(main_photo_url = request.data["fileUrl"])
-            return Response(user, status=status.HTTP_200_OK)
+        user.main_photo_url = request.data["fileUrl"]
+        user.save()
+        return Response(status=status.HTTP_200_OK)
 
     def destroy(self, request, pk=None):
         try:

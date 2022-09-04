@@ -39,8 +39,7 @@ class Notification(models.Model):
     added_date = models.DateTimeField()
     content = models.TextField(max_length=500)
     read_value = models.IntegerField()
-    user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
-    #user = models.Many(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
 
     def save(self, *args, **kwargs):
         if not self.id:
@@ -48,10 +47,15 @@ class Notification(models.Model):
             self.read_value = 0
         return super(Notification, self).save(*args, **kwargs)
 
+    class Meta:
+        ordering = ['added_date']
+
 
 class Comment(models.Model):
-    rating_user = models.ForeignKey(settings.AUTH_USER_MODEL, related_name='rating', on_delete=models.CASCADE)
-    rated_user = models.ForeignKey(settings.AUTH_USER_MODEL, related_name='rated', on_delete=models.CASCADE)
+    rating_user = models.ForeignKey(settings.AUTH_USER_MODEL,
+                                    related_name='rating', on_delete=models.CASCADE)
+    rated_user = models.ForeignKey(settings.AUTH_USER_MODEL,
+                                   related_name='rated', on_delete=models.CASCADE)
     rating = models.IntegerField(default=0.0)
     added_date = models.DateTimeField()
     content = models.TextField()
@@ -87,7 +91,7 @@ class Photoshoot(models.Model):
 
 class Portfolio(models.Model):
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
-    name = models.CharField(max_length=32)
+    name = models.CharField(max_length=64)
     description = models.TextField()
     main_photo_url = models.URLField(null=True)
     added_date = models.DateTimeField()
@@ -100,7 +104,7 @@ class Portfolio(models.Model):
 
 class Image(models.Model):
     portfolio = models.ForeignKey('Portfolio', on_delete=models.CASCADE)
-    file_url = models.ImageField(upload_to="images")
+    file_url = models.URLField(null=True)
     name = models.CharField(max_length=32)
     added_date = models.DateTimeField()
 

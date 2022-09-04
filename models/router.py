@@ -11,4 +11,3 @@ router.register(r'photographers', PhotographersViewSet, basename='photographers'
 router.register(r'models', ModelsViewSet, basename='models')
 router.register(r'users', UsersViewSet, basename='users')
 router.register(r'surveys', SurveysViewSet, basename='surveys')
-#router.register(r'notifications/{pk}/$', NotificationsViewSet, basename='notifications-detail')
